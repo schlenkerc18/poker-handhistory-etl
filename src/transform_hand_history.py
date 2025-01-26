@@ -1,21 +1,34 @@
+import sys
 import boto3
-import os
+from awsglue.utils import getResolvedOptions
+from awsglue.context import GlueContext
+from pyspark.context import SparkContext
+from pyspark.sql import SQLContext
 
-def lambda_handler(event, context):
-    # Get the S3 bucket and object key from the event
-    bucket_name = event['Records'][0]['s3']['bucket']['name']
-    object_key = event['Records'][0]['s3']['object']['key']
+# Initialize Glue and Spark contexts
+glueContext = GlueContext(SparkContext.getOrCreate())
+spark = glueContext.spark_session
+sqlContext = SQLContext(spark)
 
-    # Create an S3 client
-    s3_client = boto3.client('s3')
+# Get the job parameters
+args = getResolvedOptions(sys.argv, ['SOURCE_BUCKET', 'TARGET_BUCKET', 'FILE_NAME'])
 
-    # Download the file from S3
-    file_content = s3_client.get_object(Bucket=bucket_name, Key=object_key)['Body'].read().decode('utf-8')
+source_bucket = args['SOURCE_BUCKET']
+target_bucket = args['TARGET_BUCKET']
+file_name = args['FILE_NAME']
 
-    # Print the file contents (this will show up in CloudWatch logs)
-    print(f"Contents of the file '{object_key}':\n{file_content}")
+print("source bucket:", source_bucket)
+print("target_bucket:", target_bucket)
+print("file_name:", file_name)
 
-    return {
-        'statusCode': 200,
-        'body': f"File '{object_key}' processed successfully."
-    }
+# Read data from the source S3 bucket
+input_path = f"s3://{source_bucket}/{file_name}"
+text = spark.read.text(input_path)
+
+
+print(text)
+
+# Write the transformed data to the target S3 bucket
+output_path = f"s3://{target_bucket}/"
+
+print("Data transformation and write completed successfully!")
